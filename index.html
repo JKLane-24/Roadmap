@@ -176,6 +176,12 @@
       return fileKey ? `icons/${fileKey}.png` : null;
     }
 
+    function stripHtml(html) {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      return div.textContent || '';
+    }
+
     fetch(apiUrl)
       .then(response => response.json())
       .then(data => {
@@ -185,22 +191,18 @@
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        // 1. Parse dates
         let items = data.items.map(item => ({
           ...item,
           pubDate: new Date(item.pubDate)
         }));
 
-        // 2. Keep only this month's posts
         items = items.filter(item =>
           item.pubDate.getMonth() === currentMonth &&
           item.pubDate.getFullYear() === currentYear
         );
 
-        // 3. Sort newest first
         items.sort((a, b) => b.pubDate - a.pubDate);
 
-        // 4. Remove duplicates by title
         const seenTitles = new Set();
         feedItems = items.filter(item => {
           if (seenTitles.has(item.title)) return false;
@@ -209,7 +211,7 @@
         });
 
         if (feedItems.length === 0) {
-          container.innerHTML = '<p>No updates published this month.</p>';
+          container.textContent = 'No updates published this month.';
           loadMoreBtn.style.display = 'none';
           return;
         }
@@ -232,32 +234,56 @@
 
       itemsToLoad.forEach(item => {
         const products = extractProducts(item.categories || []);
-        const firstProduct = (item.categories || [])
-          .find(cat => knownProducts.includes(cat));
+        const firstProduct = (item.categories || []).find(cat => knownProducts.includes(cat));
         const iconUrl = firstProduct ? getProductIcon(firstProduct) : null;
 
-        const div = document.createElement('div');
-        div.className = 'feed-item';
-        div.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 15px;">
-            ${iconUrl
-              ? `<div class="product-icon">
-                   <img src="${iconUrl}" alt="${firstProduct}" />
-                 </div>`
-              : ''}
-            <div style="flex-grow: 1;">
-              <h3>
-                <a href="${item.link}" target="_blank" rel="noopener noreferrer">
-                  ${item.title}
-                </a>
-              </h3>
-              <p><strong>Date:</strong> ${item.pubDate.toLocaleDateString()}</p>
-              <p><strong>Product(s):</strong> ${products}</p>
-              <p>${item.description}</p>
-            </div>
-          </div>
-        `;
-        container.appendChild(div);
+        const feedItem = document.createElement('div');
+        feedItem.className = 'feed-item';
+
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '15px';
+
+        if (iconUrl) {
+          const iconDiv = document.createElement('div');
+          iconDiv.className = 'product-icon';
+
+          const img = document.createElement('img');
+          img.src = iconUrl;
+          img.alt = firstProduct;
+          iconDiv.appendChild(img);
+
+          row.appendChild(iconDiv);
+        }
+
+        const content = document.createElement('div');
+        content.style.flexGrow = '1';
+
+        const title = document.createElement('h3');
+        const link = document.createElement('a');
+        link.href = item.link;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = item.title;
+        title.appendChild(link);
+        content.appendChild(title);
+
+        const dateP = document.createElement('p');
+        dateP.innerHTML = `<strong>Date:</strong> ${item.pubDate.toLocaleDateString()}`;
+        content.appendChild(dateP);
+
+        const productP = document.createElement('p');
+        productP.innerHTML = `<strong>Product(s):</strong> ${products}`;
+        content.appendChild(productP);
+
+        const descP = document.createElement('p');
+        descP.textContent = stripHtml(item.description);
+        content.appendChild(descP);
+
+        row.appendChild(content);
+        feedItem.appendChild(row);
+        container.appendChild(feedItem);
       });
 
       currentIndex = nextIndex;
